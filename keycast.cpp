@@ -43,16 +43,37 @@ struct KeyLabel {
 };
 
 struct LabelSettings {
-  DWORD keyStrokeDelay;
-  DWORD lingerTime;
-  DWORD fadeDuration;
-  LOGFONT font;
-  COLORREF bgColor, textColor, borderColor;
-  DWORD bgOpacity, textOpacity, borderOpacity;
-  int borderSize;
-  int cornerSize;
+  DWORD keyStrokeDelay; // 延迟时间 unsigned long，一般是 32 位整数
+  DWORD lingerTime;     // 标签持续的时间
+  DWORD fadeDuration;   // 标签淡入淡出的时间
+  /**
+  typedef struct tagLOGFONTW
+  {
+      LONG      lfHeight;
+      LONG      lfWidth;
+      LONG      lfEscapement;
+      LONG      lfOrientation;
+      LONG      lfWeight;
+      BYTE      lfItalic;
+      BYTE      lfUnderline;
+      BYTE      lfStrikeOut;
+      BYTE      lfCharSet;
+      BYTE      lfOutPrecision;
+      BYTE      lfClipPrecision;
+      BYTE      lfQuality;
+      BYTE      lfPitchAndFamily;
+      WCHAR     lfFaceName[LF_FACESIZE];
+  } LOGFONTW, *PLOGFONTW, NEAR *NPLOGFONTW, FAR *LPLOGFONTW;
+   */
+  LOGFONT font; // 字体信息，这是 gdi+ 的一个结构体
+  COLORREF bgColor, textColor, borderColor; // 颜色信息
+  DWORD bgOpacity, textOpacity, borderOpacity; // 背景、文本和边框透明度信息
+  int borderSize;                              // 边框大小
+  int cornerSize;                              // 边框圆角大小
 };
+
 LabelSettings labelSettings, previewLabelSettings;
+
 DWORD labelSpacing;
 BOOL visibleShift = FALSE;
 BOOL visibleModifier = TRUE;
@@ -70,7 +91,7 @@ Color clearColor(0, 127, 127, 127);
 #define BRANDINGMAX 256
 WCHAR branding[BRANDINGMAX];
 WCHAR comboChars[4];
-POINT deskOrigin;
+POINT deskOrigin; // 坐标
 
 #define MAXLABELS 60
 KeyLabel keyLabels[MAXLABELS];
@@ -83,7 +104,7 @@ POINT canvasOrigin;
 #include "keycast.h"
 #include "keylog.h"
 
-WCHAR *szWinName = L"KeyCastOW";
+WCHAR *szWinName = L"KeyCastOW"; // class name and window name
 HWND hMainWnd;
 HWND hDlgSettings;
 RECT settingsDlgRect;
@@ -144,6 +165,7 @@ void log(const std::stringstream &line) {
   fprintf(logStream, "%s", line.str().c_str());
 }
 #endif
+
 void stamp(HWND hwnd, LPCWSTR text) {
   RECT rt;
   GetWindowRect(hwnd, &rt);
@@ -197,6 +219,7 @@ void stamp(HWND hwnd, LPCWSTR text) {
   ::DeleteObject(memBitmap);
   ReleaseDC(hwnd, hdc);
 }
+
 void updateLayeredWindow(HWND hwnd) {
   POINT ptSrc = {0, 0};
   BLENDFUNCTION blendFunction;
@@ -211,6 +234,7 @@ void updateLayeredWindow(HWND hwnd) {
   ReleaseDC(hwnd, hdc);
   gCanvas->ReleaseHDC(hdcBuf);
 }
+
 void eraseLabel(int i) {
   RectF &rt = keyLabels[i].rect;
   RectF rc(rt.X - labelSettings.borderSize, rt.Y - labelSettings.borderSize,
@@ -220,6 +244,7 @@ void eraseLabel(int i) {
   gCanvas->Clear(clearColor);
   gCanvas->ResetClip();
 }
+
 void drawLabelFrame(Graphics *g, const Pen *pen, const Brush *brush, RectF &rc,
                     REAL cornerSize) {
   if (cornerSize > 0) {
@@ -238,8 +263,10 @@ void drawLabelFrame(Graphics *g, const Pen *pen, const Brush *brush, RectF &rc,
     g->FillRectangle(brush, rc.X, rc.Y, rc.Width, rc.Height);
   }
 }
+
 #define BR(alpha, bgr)                                                         \
   (alpha << 24 | bgr >> 16 | (bgr & 0x0000ff00) | (bgr & 0x000000ff) << 16)
+
 void updateLabel(int i) {
   eraseLabel(i);
 
@@ -444,6 +471,7 @@ void updateCanvasSize(const POINT &pt) {
   log(line);
 #endif
 }
+
 void createCanvas() {
   HDC hdc = GetDC(hMainWnd);
   HDC hdcBuffer = CreateCompatibleDC(hdc);
@@ -460,6 +488,7 @@ void createCanvas() {
   gCanvas->SetSmoothingMode(SmoothingModeAntiAlias);
   gCanvas->SetTextRenderingHint(TextRenderingHintAntiAlias);
 }
+
 void prepareLabels() {
   HDC hdc = GetDC(hMainWnd);
   HFONT hlabelFont = CreateFontIndirect(&labelSettings.font);
@@ -642,6 +671,7 @@ void saveSettings() {
   WritePrivateProfileString(L"KeyCastOW", L"branding", branding, iniFile);
   WritePrivateProfileString(L"KeyCastOW", L"comboChars", comboChars, iniFile);
 }
+
 void fixDeskOrigin() {
   if (deskOrigin.x > desktopRect.right ||
       deskOrigin.x < desktopRect.left + labelSettings.borderSize) {
@@ -654,76 +684,101 @@ void fixDeskOrigin() {
 }
 
 void loadSettings() {
+  /**
+   * L"KeyCastOW" ini 文件中的段名，section name
+   * L"keyStrokeDelay" 键名
+   * 500 如果在配置文件中没有找到，返回这个默认值
+   * iniFile 路径
+   * fany问题。如果 ini 文件不存在呢？
+   */
   labelSettings.keyStrokeDelay =
       GetPrivateProfileInt(L"KeyCastOW", L"keyStrokeDelay", 500, iniFile);
+
   labelSettings.lingerTime =
-      GetPrivateProfileInt(L"KeyCastOW", L"lingerTime", 1200, iniFile);
+      GetPrivateProfileInt(L"KeyCastOW", L"lingerTime", 1200, iniFile); // 同上
   labelSettings.fadeDuration =
-      GetPrivateProfileInt(L"KeyCastOW", L"fadeDuration", 310, iniFile);
-  labelSettings.bgColor =
-      GetPrivateProfileInt(L"KeyCastOW", L"bgColor", RGB(75, 75, 75), iniFile);
-  labelSettings.textColor = GetPrivateProfileInt(L"KeyCastOW", L"textColor",
-                                                 RGB(255, 255, 255), iniFile);
+      GetPrivateProfileInt(L"KeyCastOW", L"fadeDuration", 310, iniFile); // 同上
+  labelSettings.bgColor = GetPrivateProfileInt(
+      L"KeyCastOW", L"bgColor", RGB(75, 75, 75), iniFile); // 同上
+  labelSettings.textColor = GetPrivateProfileInt(
+      L"KeyCastOW", L"textColor", RGB(255, 255, 255), iniFile); // 同上
   labelSettings.bgOpacity =
-      GetPrivateProfileInt(L"KeyCastOW", L"bgOpacity", 200, iniFile);
+      GetPrivateProfileInt(L"KeyCastOW", L"bgOpacity", 200, iniFile); // 同上
   labelSettings.textOpacity =
-      GetPrivateProfileInt(L"KeyCastOW", L"textOpacity", 255, iniFile);
-  labelSettings.borderOpacity =
-      GetPrivateProfileInt(L"KeyCastOW", L"borderOpacity", 200, iniFile);
-  labelSettings.borderColor = GetPrivateProfileInt(L"KeyCastOW", L"borderColor",
-                                                   RGB(0, 128, 255), iniFile);
+      GetPrivateProfileInt(L"KeyCastOW", L"textOpacity", 255, iniFile); // 同上
+  labelSettings.borderOpacity = GetPrivateProfileInt(
+      L"KeyCastOW", L"borderOpacity", 200, iniFile); // 同上
+  labelSettings.borderColor = GetPrivateProfileInt(
+      L"KeyCastOW", L"borderColor", RGB(0, 128, 255), iniFile); // 同上
   labelSettings.borderSize =
-      GetPrivateProfileInt(L"KeyCastOW", L"borderSize", 8, iniFile);
+      GetPrivateProfileInt(L"KeyCastOW", L"borderSize", 8, iniFile); // 同上
   labelSettings.cornerSize =
-      GetPrivateProfileInt(L"KeyCastOW", L"cornerSize", 2, iniFile);
+      GetPrivateProfileInt(L"KeyCastOW", L"cornerSize", 2, iniFile); // 同上
   labelSpacing =
-      GetPrivateProfileInt(L"KeyCastOW", L"labelSpacing", 1, iniFile);
+      GetPrivateProfileInt(L"KeyCastOW", L"labelSpacing", 1, iniFile); // 同上
   maximumLines =
-      GetPrivateProfileInt(L"KeyCastOW", L"maximumLines", 10, iniFile);
+      GetPrivateProfileInt(L"KeyCastOW", L"maximumLines", 10, iniFile); // 同上
   if (maximumLines == 0) {
     maximumLines = 1;
   }
-  deskOrigin.x = GetPrivateProfileInt(L"KeyCastOW", L"offsetX", 2, iniFile);
-  deskOrigin.y = GetPrivateProfileInt(L"KeyCastOW", L"offsetY", 2, iniFile);
-  MONITORINFO mi;
-  GetWorkAreaByOrigin(deskOrigin, mi);
-  CopyMemory(&desktopRect, &mi.rcWork, sizeof(RECT));
+  deskOrigin.x =
+      GetPrivateProfileInt(L"KeyCastOW", L"offsetX", 2, iniFile); // 同上
+  deskOrigin.y =
+      GetPrivateProfileInt(L"KeyCastOW", L"offsetY", 2, iniFile); // 同上
+  MONITORINFO mi;                      // 显示器的信息结构体
+  GetWorkAreaByOrigin(deskOrigin, mi); // 获取显示器信息
+  CopyMemory(
+      &desktopRect, &mi.rcWork,
+      sizeof(RECT)); // 把 mi.rcWork 中的内容复制到 desktopRect 这个矩形中
+  /**
+   * hMainWnd 要施加操作的窗口的矩形
+   * desktopRect.left X 坐标
+   * desktopRect.top Y 坐标
+   * 1 Width
+   * 1 Height
+   * TRUE 移动后重绘
+   */
   MoveWindow(hMainWnd, desktopRect.left, desktopRect.top, 1, 1, TRUE);
-  fixDeskOrigin();
+  fixDeskOrigin(); // 检查 deskOrigin 的合法性
   visibleShift =
-      GetPrivateProfileInt(L"KeyCastOW", L"visibleShift", 0, iniFile);
-  visibleModifier =
-      GetPrivateProfileInt(L"KeyCastOW", L"visibleModifier", 1, iniFile);
+      GetPrivateProfileInt(L"KeyCastOW", L"visibleShift", 0, iniFile); // 同上
+  visibleModifier = GetPrivateProfileInt(L"KeyCastOW", L"visibleModifier", 1,
+                                         iniFile); // 同上
   mouseCapturing =
-      GetPrivateProfileInt(L"KeyCastOW", L"mouseCapturing", 1, iniFile);
-  mouseCapturingMod =
-      GetPrivateProfileInt(L"KeyCastOW", L"mouseCapturingMod", 0, iniFile);
+      GetPrivateProfileInt(L"KeyCastOW", L"mouseCapturing", 1, iniFile); // 同上
+  mouseCapturingMod = GetPrivateProfileInt(L"KeyCastOW", L"mouseCapturingMod",
+                                           0, iniFile); // 同上
   keyAutoRepeat =
-      GetPrivateProfileInt(L"KeyCastOW", L"keyAutoRepeat", 1, iniFile);
-  mergeMouseActions =
-      GetPrivateProfileInt(L"KeyCastOW", L"mergeMouseActions", 1, iniFile);
-  alignment = GetPrivateProfileInt(L"KeyCastOW", L"alignment", 1, iniFile);
-  onlyCommandKeys =
-      GetPrivateProfileInt(L"KeyCastOW", L"onlyCommandKeys", 0, iniFile);
+      GetPrivateProfileInt(L"KeyCastOW", L"keyAutoRepeat", 1, iniFile); // 同上
+  mergeMouseActions = GetPrivateProfileInt(L"KeyCastOW", L"mergeMouseActions",
+                                           1, iniFile); // 同上
+  alignment =
+      GetPrivateProfileInt(L"KeyCastOW", L"alignment", 1, iniFile); // 同上
+  onlyCommandKeys = GetPrivateProfileInt(L"KeyCastOW", L"onlyCommandKeys", 0,
+                                         iniFile); // 同上
   draggableLabel =
-      GetPrivateProfileInt(L"KeyCastOW", L"draggableLabel", 0, iniFile);
-  if (draggableLabel) {
+      GetPrivateProfileInt(L"KeyCastOW", L"draggableLabel", 0, iniFile); // 同上
+  if (draggableLabel) { // 根据这个标签来重新设定窗口的属性
     SetWindowLong(hMainWnd, GWL_EXSTYLE,
                   GetWindowLong(hMainWnd, GWL_EXSTYLE) & ~WS_EX_TRANSPARENT);
   } else {
     SetWindowLong(hMainWnd, GWL_EXSTYLE,
                   GetWindowLong(hMainWnd, GWL_EXSTYLE) | WS_EX_TRANSPARENT);
   }
-  tcModifiers =
-      GetPrivateProfileInt(L"KeyCastOW", L"tcModifiers", MOD_ALT, iniFile);
-  tcKey = GetPrivateProfileInt(L"KeyCastOW", L"tcKey", 0x42, iniFile);
+  tcModifiers = GetPrivateProfileInt(L"KeyCastOW", L"tcModifiers", MOD_ALT,
+                                     iniFile);                         // 同上
+  tcKey = GetPrivateProfileInt(L"KeyCastOW", L"tcKey", 0x42, iniFile); // 同上
   GetPrivateProfileString(
       L"KeyCastOW", L"branding",
       L"Hi there, press any key to try, double click to configure.", branding,
-      BRANDINGMAX, iniFile);
+      BRANDINGMAX, iniFile); // 同上
   GetPrivateProfileString(L"KeyCastOW", L"comboChars", L"<->", comboChars, 4,
-                          iniFile);
-  memset(&labelSettings.font, 0, sizeof(labelSettings.font));
+                          iniFile); // 同上
+  memset(
+      &labelSettings.font, 0,
+      sizeof(
+          labelSettings.font)); // 把 font 这个结构体清零，以便下面进行另外赋值
+  // 可惜这些在高分屏上根本没有用，gdi+ 效果是不行的
   labelSettings.font.lfCharSet = DEFAULT_CHARSET;
   labelSettings.font.lfHeight = -37;
   labelSettings.font.lfPitchAndFamily = DEFAULT_PITCH;
@@ -731,9 +786,10 @@ void loadSettings() {
   labelSettings.font.lfOutPrecision = OUT_DEFAULT_PRECIS;
   labelSettings.font.lfClipPrecision = CLIP_DEFAULT_PRECIS;
   labelSettings.font.lfQuality = ANTIALIASED_QUALITY;
-  wcscpy_s(labelSettings.font.lfFaceName, LF_FACESIZE, TEXT("Arial Black"));
+  wcscpy_s(labelSettings.font.lfFaceName, LF_FACESIZE,
+           TEXT("Arial Black")); // 赋值
   GetPrivateProfileStruct(L"KeyCastOW", L"labelFont", &labelSettings.font,
-                          sizeof(labelSettings.font), iniFile);
+                          sizeof(labelSettings.font), iniFile); // 同上
 }
 
 void renderSettingsData(HWND hwndDlg) {
@@ -1346,24 +1402,30 @@ int WINAPI WinMain(HINSTANCE hThisInst, HINSTANCE hPrevInst, LPSTR lpszArgs,
 
   // 加载配置
   loadSettings();
+  // 更新 canvas 的 size
   updateCanvasSize(deskOrigin);
+  // 创建一个对话框窗口，这个窗口就是设置窗口
+  // hThisInst 当前程序的实例句柄
+  // IDD_DLGSETTINGS
   hDlgSettings = CreateDialog(hThisInst, MAKEINTRESOURCE(IDD_DLGSETTINGS), NULL,
                               (DLGPROC)SettingsWndProc);
+  // 创建一个 STAMP 窗口
   MyRegisterClassEx(hThisInst, L"STAMP", DraggableWndProc);
   hWndStamp = CreateWindowEx(WS_EX_LAYERED | WS_EX_NOACTIVATE, L"STAMP",
                              L"STAMP", WS_VISIBLE | WS_POPUP, 0, 0, 1, 1, NULL,
                              NULL, hThisInst, NULL);
 
+  // 注册快捷键
   if (!RegisterHotKey(NULL, 1, tcModifiers | MOD_NOREPEAT, tcKey)) {
     MessageBox(NULL,
                L"Unable to register hotkey, you probably need go to settings "
                L"to redefine your hotkey for toggle capturing.",
                L"Warning", MB_OK | MB_ICONWARNING);
   }
-  UpdateWindow(hMainWnd);
+  UpdateWindow(hMainWnd); // 更新窗口
 
-  createCanvas();
-  prepareLabels();
+  createCanvas(); // 创建 canvas
+  prepareLabels(); // 
   ShowWindow(hMainWnd, SW_SHOW);
   HFONT hlabelFont =
       CreateFont(20, 10, 0, 0, FW_BLACK, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
@@ -1384,7 +1446,7 @@ int WINAPI WinMain(HINSTANCE hThisInst, HINSTANCE hPrevInst, LPSTR lpszArgs,
 
   while (GetMessage(&msg, NULL, 0, 0)) {
     if (msg.message == WM_HOTKEY) {
-      if (kbdhook) {
+      if (kbdhook) { // 如果当前是开启的状态，那么，执行关闭的操作
         showText(L"\u263b - KeyCastOW OFF", 1);
         UnhookWindowsHookEx(kbdhook);
         kbdhook = NULL;
